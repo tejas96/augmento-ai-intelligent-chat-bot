@@ -1,0 +1,26 @@
+# Minimal requirements for core functionality
+fastapi
+uvicorn[standard]
+python-multipart
+
+# LangChain core packages
+langchain
+langchain-aws
+langchain-core
+langgraph
+
+# AWS SDK
+boto3
+
+# Core dependencies
+pydantic
+pydantic-settings
+python-dotenv
+loguru
+
+# Image processing
+Pillow
+requests
+
+# Basic async support
+aiofiles 

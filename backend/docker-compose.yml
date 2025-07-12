@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: langgraph-chatbot-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=true
+      - HOST=0.0.0.0
+      - PORT=8000
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+      - BEDROCK_REGION=${BEDROCK_REGION:-us-east-1}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-langgraph-chatbot-images}
+      - BEDROCK_CLAUDE_MODEL=${BEDROCK_CLAUDE_MODEL:-anthropic.claude-3-sonnet-20240229-v1:0}
+      - BEDROCK_TITAN_IMAGE_MODEL=${BEDROCK_TITAN_IMAGE_MODEL:-amazon.titan-image-generator-v1}
+      - BEDROCK_STABILITY_MODEL=${BEDROCK_STABILITY_MODEL:-stability.stable-diffusion-xl-base-v1-0}
+      - CORS_ORIGINS=["http://localhost:3000", "http://localhost:3001", "http://localhost:8080"]
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-10485760}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./logs:/app/logs
+      - ~/.aws:/home/appuser/.aws:ro  # Mount AWS credentials (optional)
+    networks:
+      - chatbot-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Redis for session storage (future enhancement)
+  redis:
+    image: redis:7-alpine
+    container_name: langgraph-chatbot-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - chatbot-network
+    command: redis-server --appendonly yes
+
+  # Optional: PostgreSQL for conversation history (future enhancement)
+  postgres:
+    image: postgres:15-alpine
+    container_name: langgraph-chatbot-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=chatbot
+      - POSTGRES_USER=chatbot
+      - POSTGRES_PASSWORD=chatbot123
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - chatbot-network
+
+  # Optional: Nginx reverse proxy (production)
+  nginx:
+    image: nginx:alpine
+    container_name: langgraph-chatbot-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+    networks:
+      - chatbot-network
+
+networks:
+  chatbot-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+  postgres_data: 
